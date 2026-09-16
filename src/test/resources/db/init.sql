@@ -1849,6 +1849,7 @@ INSERT INTO public.core_datastore (entity_key, entity_value) VALUES ('core.cache
 INSERT INTO public.core_datastore (entity_key, entity_value) VALUES ('core.cache.status.XMLTransformerCacheService(XSLT).enabled', '1');
 INSERT INTO public.core_datastore (entity_key, entity_value) VALUES ('core.cache.status.DatastoreCacheService.enabled', '0');
 INSERT INTO public.core_datastore (entity_key, entity_value) VALUES ('core.cache.status.identitystore.identityDtoCache.enabled', '0');
+INSERT INTO public.core_datastore (entity_key, entity_value) VALUES ('core.cache.status.identitystore.identityAccountHistoryDtoCache.enabled', '0');
 
 
 --

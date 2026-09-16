@@ -26,3 +26,4 @@ identitystore.identityAttributeValidationCache.enabled=1
 identitystore.refAttributeCertificationDefinitionCache.enabled=1
 identitystore.qualityBaseCache.enabled=1
 identitystore.identityDtoCache.enabled=1
+identitystore.identityAccountHistoryDtoCache.enabled=1

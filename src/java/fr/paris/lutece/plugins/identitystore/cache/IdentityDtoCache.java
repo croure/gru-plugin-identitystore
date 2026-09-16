@@ -44,7 +44,9 @@ import fr.paris.lutece.portal.service.util.AppLogService;
 import org.apache.commons.lang3.StringUtils;
 
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Cache sur les requêtes d'identité (par <code>${customerId}</code> ou <code>${connectionId}</code>), qui cache :
@@ -123,6 +125,26 @@ public class IdentityDtoCache extends AbstractCacheableService
             return null;
         }
         return this.get( identity.getCustomerId( ), identity.getLastUpdateDate( ), serviceContract );
+    }
+
+    /**
+     * Get the master identities from a given old <code>connectionId</code>.
+     * This means the given <code>connectionId</code> is not the identities current <code>connectionId</code>, but must be present in their account history.
+     * The master identity is search recursively over the <code>masterIdentityId</code>.
+     * It means that if identity A is merged into identity B, if A is found with the given old <code>connectionId</code>, it will return B.
+     * @param connectionId the old connection ID to search for
+     * @param serviceContract the client service contract
+     * @return the master {@link IdentityDto} found or <code>null</code> if no match
+     */
+    public List<IdentityDto> getMasterIdentitiesByOldConnectionId( final String connectionId, final ServiceContract serviceContract )
+    {
+        final List<Identity> identityList = IdentityHome.findMasterIdentitiesByOldConnectionId(connectionId, false).stream()
+                .filter(i -> i != null && StringUtils.isNotBlank(i.getCustomerId()) && i.getLastUpdateDate() != null).collect(Collectors.toList());
+        if ( identityList.isEmpty( ) )
+        {
+            return List.of( );
+        }
+        return identityList.stream().map(i -> this.get( i.getCustomerId( ), i.getLastUpdateDate( ), serviceContract ) ).collect(Collectors.toList());
     }
 
     /**

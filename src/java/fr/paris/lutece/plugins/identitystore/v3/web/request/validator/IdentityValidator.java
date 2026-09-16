@@ -43,7 +43,6 @@ import fr.paris.lutece.plugins.identitystore.web.exception.ResourceConsistencyEx
 import fr.paris.lutece.portal.service.spring.SpringContextService;
 
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.util.Objects;
 
 public class IdentityValidator
@@ -197,19 +196,40 @@ public class IdentityValidator
     }
 
     /**
-     * When the searched identity was merged, returns an IdentitySearchMessage to indicate that 
-     * the returned Identity is the consolidated identity.
-     * 
+     * When the identity corresponding to the requested CUID was merged, returns an IdentitySearchMessage to indicate that the returned Identity is the consolidated identity.
+     *
      * @param result the returned identity
-     * @param cuid (requested or null)
-     * @param guid (requested or null)
+     * @param cuid requested CUID
      * @return a warning  IdentitySearchMessage
      */
-    public IdentitySearchMessage verifyIfConsolidatedIdentitySearchResult(final IdentityDto result, final String cuid, final String guid) {
+    public IdentitySearchMessage verifyIfConsolidatedIdentityCuidSearchResult(final IdentityDto result, final String cuid) {
         if (result != null) {
-            if ((cuid != null && !Objects.equals(result.getCustomerId(), cuid)) || (guid != null && !Objects.equals(result.getConnectionId(), guid))) {
+            if (cuid != null && !Objects.equals(result.getCustomerId(), cuid)) {
                 final IdentitySearchMessage alert = new IdentitySearchMessage();
                 alert.setMessage("Warning : the requested identity was merged, the returned Identity is the consolidated identity.");
+                return alert;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * When the identity corresponding to the requested CUID was merged, returns an IdentitySearchMessage to indicate that the returned Identity is the consolidated identity.
+     * When the requested GUID correspond to an old GUID belonging to the identity, returns an IdentitySearchMessage to indicate that the returned Identity has an updated GUID.
+     *
+     * @param result the returned identity
+     * @param guid requested GUID
+     * @return a warning  IdentitySearchMessage
+     */
+    public IdentitySearchMessage verifyIfConsolidatedIdentityGuidSearchResult(final IdentityDto result, final String guid) {
+        if (result != null) {
+            if (guid != null && !guid.equalsIgnoreCase( result.getConnectionId( ) ) ) {
+                final IdentitySearchMessage alert = new IdentitySearchMessage();
+                if (result.getAccountHistory().stream().anyMatch(h -> guid.equalsIgnoreCase( h.getConnectionId( ) ) ) ) {
+                    alert.setMessage("Warning : the requested GUID correspond to an old GUID belonging to the returned identity.");
+                } else {
+                    alert.setMessage("Warning : the requested identity was merged, the returned Identity is the consolidated identity.");
+                }
                 return alert;
             }
         }

@@ -53,8 +53,6 @@ import fr.paris.lutece.plugins.identitystore.web.exception.ResourceConsistencyEx
 import fr.paris.lutece.plugins.identitystore.web.exception.ResourceNotFoundException;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.Objects;
-
 /**
  * This class represents a get request for IdentityStoreRestServive
  *
@@ -128,10 +126,10 @@ public class IdentityStoreGetRequest extends AbstractIdentityStoreAppCodeRequest
         final IdentitySearchResponse response = new IdentitySearchResponse( );
 
         // renvoie un ResourceNotFoundException si pas d'identité trouvée
-        final IdentityDto identityDto = IdentityService.instance().search(_strCustomerId, StringUtils.EMPTY, serviceContract, _author);
+        final IdentityDto identityDto = IdentityService.instance().searchByCustomerId(_strCustomerId, serviceContract, _author);
         response.getIdentities( ).add(identityDto);
 
-        final IdentitySearchMessage alert = IdentityValidator.instance().verifyIfConsolidatedIdentitySearchResult(identityDto, _strCustomerId, null);
+        final IdentitySearchMessage alert = IdentityValidator.instance().verifyIfConsolidatedIdentityCuidSearchResult(identityDto, _strCustomerId);
         if (alert != null) {
             response.getAlerts().add(alert);
         }

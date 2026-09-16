@@ -44,12 +44,15 @@ import fr.paris.lutece.plugins.identitystore.business.contract.AttributeRight;
 import fr.paris.lutece.plugins.identitystore.business.contract.ServiceContract;
 import fr.paris.lutece.plugins.identitystore.business.duplicates.suspicions.SuspiciousIdentityHome;
 import fr.paris.lutece.plugins.identitystore.business.identity.Identity;
+import fr.paris.lutece.plugins.identitystore.business.identity.IdentityAccountHistory;
 import fr.paris.lutece.plugins.identitystore.business.identity.IdentityAttribute;
 import fr.paris.lutece.plugins.identitystore.business.identity.IdentityHome;
 import fr.paris.lutece.plugins.identitystore.business.referentiel.RefAttributeCertificationLevel;
 import fr.paris.lutece.plugins.identitystore.business.referentiel.RefAttributeCertificationProcessus;
 import fr.paris.lutece.plugins.identitystore.business.referentiel.RefCertificationLevel;
 import fr.paris.lutece.plugins.identitystore.business.referentiel.RefCertificationLevelHome;
+import fr.paris.lutece.plugins.identitystore.cache.IdentityAccountHistoryDtoCache;
+import fr.paris.lutece.plugins.identitystore.cache.IdentityDtoCache;
 import fr.paris.lutece.plugins.identitystore.service.attribute.IdentityAttributeService;
 import fr.paris.lutece.plugins.identitystore.service.contract.AttributeCertificationDefinitionService;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.application.ClientApplicationDto;
@@ -58,6 +61,7 @@ import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.common.AttributeKeyDt
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.common.AttributeType;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.common.AttributeValueDto;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.common.ExpirationDefinition;
+import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.common.IdentityAccountHistoryDto;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.common.IdentityDto;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.common.MergeDefinition;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.contract.AttributeDefinitionDto;
@@ -69,8 +73,8 @@ import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.referentiel.Attribute
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.referentiel.AttributeCertificationProcessusDto;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.referentiel.LevelDto;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.util.Constants;
-import fr.paris.lutece.plugins.identitystore.web.exception.IdentityStoreException;
 import fr.paris.lutece.plugins.identitystore.web.exception.ResourceNotFoundException;
+import fr.paris.lutece.portal.service.spring.SpringContextService;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -89,6 +93,10 @@ import java.util.stream.Collectors;
  */
 public final class DtoConverter
 {
+
+    private static final IdentityAccountHistoryDtoCache _identityAccountHistoryDtoCache =
+            SpringContextService.getBean( "identitystore.identityAccountHistoryDtoCache" );
+
     /**
      * private constructor
      */
@@ -142,6 +150,13 @@ public final class DtoConverter
             {
                 identityDto.getAttributes( ).add( convertAttributeToDto( attribute ) );
             }
+        }
+
+        final List<IdentityAccountHistory> accountHistory =
+                _identityAccountHistoryDtoCache.getFullIdentityAccountHistory( identity.getId( ), identity.getLastUpdateDate( ) );
+        if ( accountHistory != null && !accountHistory.isEmpty( ) )
+        {
+            accountHistory.stream( ).map( DtoConverter::convertIdentityAccountHistoryToDto ).forEach( dto -> identityDto.getAccountHistory( ).add( dto ) );
         }
 
         return identityDto;
@@ -502,5 +517,14 @@ public final class DtoConverter
         valueDto.setValue( attributeValue.getValue( ) );
         valueDto.setLabel( attributeValue.getLabel( ) );
         return valueDto;
+    }
+
+    public static IdentityAccountHistoryDto convertIdentityAccountHistoryToDto( final IdentityAccountHistory identityAccountHistory )
+    {
+        final IdentityAccountHistoryDto dto = new IdentityAccountHistoryDto( );
+        dto.setConnectionId( identityAccountHistory.getConnectionId( ) );
+        dto.setDeletionDate( identityAccountHistory.getDeletionDate( ) );
+        dto.setCreationDate( identityAccountHistory.getCreationDate( ) );
+        return dto;
     }
 }

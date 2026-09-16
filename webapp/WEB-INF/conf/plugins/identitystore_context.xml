@@ -31,6 +31,7 @@
     <bean id="identitystore.identityAttributeValidationCache"  class="fr.paris.lutece.plugins.identitystore.cache.IdentityAttributeValidationCache"/>
     <bean id="identitystore.refAttributeCertificationDefinitionCache"  class="fr.paris.lutece.plugins.identitystore.cache.RefAttributeCertificationDefinitionCache"/>
     <bean id="identitystore.identityDtoCache" class="fr.paris.lutece.plugins.identitystore.cache.IdentityDtoCache"/>
+    <bean id="identitystore.identityAccountHistoryDtoCache" class="fr.paris.lutece.plugins.identitystore.cache.IdentityAccountHistoryDtoCache"/>
     <bean id="identitystore.identityHistoryCache" class="fr.paris.lutece.plugins.identitystore.cache.IdentityHistoryStatusCache"/>
 	<bean id="identitystore.clientApplicationCache" class="fr.paris.lutece.plugins.identitystore.cache.ClientApplicationCache"/>
 

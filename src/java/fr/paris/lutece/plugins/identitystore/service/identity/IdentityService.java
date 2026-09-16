@@ -40,6 +40,7 @@ import fr.paris.lutece.plugins.identitystore.business.duplicates.suspicions.Excl
 import fr.paris.lutece.plugins.identitystore.business.duplicates.suspicions.SuspiciousIdentity;
 import fr.paris.lutece.plugins.identitystore.business.duplicates.suspicions.SuspiciousIdentityHome;
 import fr.paris.lutece.plugins.identitystore.business.identity.Identity;
+import fr.paris.lutece.plugins.identitystore.business.identity.IdentityAccountHistory;
 import fr.paris.lutece.plugins.identitystore.business.identity.IdentityAttribute;
 import fr.paris.lutece.plugins.identitystore.business.identity.IdentityHome;
 import fr.paris.lutece.plugins.identitystore.business.rules.duplicate.DuplicateRule;
@@ -64,6 +65,7 @@ import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.common.ResponseStatus
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.crud.IdentityChangeRequest;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.crud.UpdatedIdentityDto;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.history.AttributeChangeType;
+import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.history.IdentityChange;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.history.IdentityChangeType;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.merge.IdentityMergeRequest;
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.search.IdentitySearchRequest;
@@ -85,6 +87,9 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.sql.Timestamp;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -92,7 +97,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -100,6 +104,7 @@ public class IdentityService
 {
     // Conf
     private static final String PIVOT_UNCERTIF_LEVEL_THRESHOLD = "identitystore.identity.uncertify.attribute.pivot.level.threshold";
+    private static final String GUID_SEARCH_EXTENDED_IN_HISTORY = "identitystore.identity.extend.guid.search.to.history";
 
     // EVENTS FOR ACCESS LOGGING
     public static final String CREATE_IDENTITY_EVENT_CODE = "CREATE_IDENTITY";
@@ -252,10 +257,24 @@ public class IdentityService
             if ( !StringUtils.equalsIgnoreCase( identity.getConnectionId( ), request.getIdentity( ).getConnectionId( ) )
                     && StringUtils.isNotEmpty( request.getIdentity( ).getConnectionId( ) ) )
             {
+                final String oldConnectionId = identity.getConnectionId();
                 metadata.put(Constants.METADATA_NEW_GUID, request.getIdentity( ).getConnectionId( ) );
-                metadata.put(Constants.METADATA_OLD_GUID, identity.getConnectionId( ) );
+                metadata.put(Constants.METADATA_OLD_GUID, oldConnectionId);
                 identity.setConnectionId( request.getIdentity( ).getConnectionId( ) );
                 IdentityHome.update( identity );
+                if ( StringUtils.isNotBlank( oldConnectionId ) )
+                {
+                    // Find date when the old GUID was set to the identity
+                    final Timestamp oldGuidCreationDate =
+                            IdentityHome.getIdentityGuidCreationDate( identity.getCustomerId( ), oldConnectionId );
+
+                    final IdentityAccountHistory history = new IdentityAccountHistory( );
+                    history.setConnectionId( oldConnectionId );
+                    history.setIdIdentity( identity.getId( ) );
+                    history.setDeletionDate( Timestamp.from( ZonedDateTime.now( ZoneId.systemDefault( ) ).toInstant( ) ) );
+                    history.setCreationDate( oldGuidCreationDate == null ? identity.getCreationDate( ) : oldGuidCreationDate );
+                    IdentityHome.insertIdentityAccountHistory( history );
+                }
             }
 
             // => process update :
@@ -556,21 +575,19 @@ public class IdentityService
      * Perform an identity research by customer or connection ID.
      *
      * @param customerId
-     * @param connectionId
      * @param serviceContract
      * @param author
      *            the author of the request
      * @throws ResourceNotFoundException
      */
-    public IdentityDto search( final String customerId, final String connectionId, final ServiceContract serviceContract, final RequestAuthor author )
+    public IdentityDto searchByCustomerId(final String customerId, final ServiceContract serviceContract, final RequestAuthor author )
             throws IdentityStoreException
     {
         final String clientCode = serviceContract.getClientCode( );
         AccessLogService.getInstance( ).info( AccessLoggerConstants.EVENT_TYPE_READ, GET_IDENTITY_EVENT_CODE, _internalUserService.getApiUser( clientCode ),
-                SecurityUtil.logForgingProtect( StringUtils.isNotBlank( customerId ) ? customerId : connectionId ), SPECIFIC_ORIGIN );
+                SecurityUtil.logForgingProtect( customerId ), SPECIFIC_ORIGIN );
 
-        final IdentityDto identityDto = StringUtils.isNotBlank( customerId ) ? _identityDtoCache.getMasterIdentityByCustomerId( customerId, serviceContract )
-                : _identityDtoCache.getMasterIdentityByConnectionId( connectionId, serviceContract );
+        final IdentityDto identityDto = _identityDtoCache.getMasterIdentityByCustomerId( customerId, serviceContract );
         if ( identityDto == null )
         {
             // #345 : If the identity doesn't exist, make an extra search in the history (only for CUID search).
@@ -600,6 +617,63 @@ public class IdentityService
             }
             return identityDto;
         }
+    }
+
+    /**
+     * Perform an identity research by connection ID.
+     *
+     * @param connectionId - the connection ID
+     * @param serviceContract - the service contract
+     * @param author
+     *            the author of the request
+     * @throws ResourceNotFoundException
+     */
+    public List<IdentityDto> searchByConnectionId( final String connectionId, final ServiceContract serviceContract, final RequestAuthor author )
+            throws IdentityStoreException
+    {
+        final String clientCode = serviceContract.getClientCode( );
+        AccessLogService.getInstance( ).info( AccessLoggerConstants.EVENT_TYPE_READ, GET_IDENTITY_EVENT_CODE, _internalUserService.getApiUser( clientCode ),
+                SecurityUtil.logForgingProtect( connectionId ), SPECIFIC_ORIGIN );
+
+        final List<IdentityDto> resultList;
+        final IdentityDto result = _identityDtoCache.getMasterIdentityByConnectionId( connectionId, serviceContract );
+        if ( result != null )
+        {
+            resultList = List.of( result );
+        }
+        else if ( AppPropertiesService.getPropertyBoolean(GUID_SEARCH_EXTENDED_IN_HISTORY, true ) )
+        {
+            // If the identity was not found with the current connection ID, perform another search in the connection ID history
+            resultList = _identityDtoCache.getMasterIdentitiesByOldConnectionId( connectionId, serviceContract );
+
+            if ( resultList.isEmpty( ) )
+            {
+                throw new ResourceNotFoundException( "The requested identity could not be found.", Constants.PROPERTY_REST_ERROR_NO_IDENTITY_FOUND );
+            }
+        }
+        else
+        {
+            throw new ResourceNotFoundException( "The requested identity could not be found.", Constants.PROPERTY_REST_ERROR_NO_IDENTITY_FOUND );
+        }
+
+        if ( author != null )
+        {
+            for ( final IdentityDto identityDto : resultList )
+            {
+                AccessLogService.getInstance( ).info( AccessLoggerConstants.EVENT_TYPE_READ, SEARCH_IDENTITY_EVENT_CODE,
+                        _internalUserService.getApiUser( author, clientCode ), SecurityUtil.logForgingProtect( identityDto.getCustomerId( ) ),
+                        SPECIFIC_ORIGIN );
+
+                if ( author.getType( ).equals( AuthorType.agent ) )
+                {
+                    /* Indexation et historique */
+                    _identityStoreNotifyListenerService.notifyListenersIdentityChange( IdentityChangeType.READ, DtoConverter.convertDtoToIdentity( identityDto ),
+                            ResponseStatusType.OK.name( ), "Operation completed successfully", author, clientCode, new HashMap<>( ) );
+                }
+            }
+        }
+
+        return resultList;
     }
 
     /**

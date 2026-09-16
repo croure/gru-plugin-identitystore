@@ -166,6 +166,7 @@ public class IdentityStoreCreateRequest extends AbstractIdentityStoreAppCodeRequ
 
         response.setCustomerId( createdIdentity.getCustomerId( ) );
         response.setCreationDate( createdIdentity.getCreationDate( ) );
+        response.setConnectionId( createdIdentity.getConnectionId( ) );
 
         final boolean incompleteCreation = attrStatusList.stream( ).anyMatch( s -> s.getStatus( ).equals( AttributeChangeStatus.NOT_CREATED ) );
         final ResponseStatus status = incompleteCreation ? ResponseStatusFactory.incompleteSuccess( ) : ResponseStatusFactory.success( );
