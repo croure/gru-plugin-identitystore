@@ -387,4 +387,50 @@ public interface IIdentityDAO
      * reset UnicityHashCode when necessary
      */
     void resetUnicityHashCode( Identity identity, Plugin plugin );
+
+    /**
+     * Retrieve the identity full account history
+     * @param identityId - the identity ID
+     * @param plugin - the plugin
+     */
+    List<IdentityAccountHistory> selectFullIdentityAccountHistory( final int identityId, final Plugin plugin );
+
+    /**
+     * Returns the identities having the requested customerId in their account history.
+     * @param connectionId - the connection ID
+     * @param plugin - the plugin
+     */
+    List<Identity> searchIdentityFromOldGuid( final String connectionId, final Plugin plugin );
+
+    /**
+     * Returns the master identities of the identities having the requested connection ID in their account history.
+     * Each master identity is returned only once, even if several identities of its merge tree had this connection ID.
+     * @param strConnectionId - the old connection ID
+     * @param plugin - the plugin
+     * @return the master identities
+     */
+    List<Identity> selectNotMergedByOldConnectionId( final String strConnectionId, final Plugin plugin );
+
+    /**
+     * Delete the identity account history
+     * @param identityId - the identity ID
+     * @param plugin - the plugin
+     */
+    void deleteIdentityAccountHistory( final int identityId, final Plugin plugin );
+
+    /**
+     * Insert a new identity account history
+     * @param identityAccountHistory - the identity account history
+     * @param plugin - the plugin
+     */
+    void insertIdentityAccountHistory( final IdentityAccountHistory identityAccountHistory, final Plugin plugin );
+
+    /**
+     * Get the GUID creation date for the identity linked to the provided CUID
+     * @param cuid the identity CUID
+     * @param guid the GUID
+     * @param plugin the plugin
+     * @return the GUID creation date for the identity linked to the provided CUID, or null if the GUID was never set to the identity
+     */
+    Timestamp getIdentityGuidCreationDate( final String cuid, final String guid, final Plugin plugin );
 }

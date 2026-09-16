@@ -4,6 +4,7 @@
 
 
 DROP TABLE IF EXISTS identitystore_service_contract_attribute_certification CASCADE;
+DROP TABLE IF EXISTS identitystore_identity_account_history CASCADE;
 DROP TABLE IF EXISTS identitystore_identity CASCADE;
 DROP TABLE IF EXISTS identitystore_service_contract_attribute_requirement CASCADE;
 DROP TABLE IF EXISTS identitystore_service_contract_attribute_right CASCADE;
@@ -420,3 +421,16 @@ CREATE TABLE identitystore_ref_attribute_values
 );
 ALTER TABLE identitystore_ref_attribute_values
     ADD CONSTRAINT fk_id_attribute FOREIGN KEY (id_attribute) REFERENCES identitystore_ref_attribute (id_attribute);
+
+--
+-- Structure for table identitystore_identity_account_history
+--
+CREATE TABLE identitystore_identity_account_history (
+    connection_id varchar(100) NOT NULL,
+    id_identity   int NOT NULL REFERENCES identitystore_identity(id_identity),
+    creation_date timestamp(3) default CURRENT_TIMESTAMP NOT NULL,
+    deletion_date timestamp(3) default CURRENT_TIMESTAMP NOT NULL,
+    PRIMARY KEY (connection_id, id_identity, creation_date)
+);
+CREATE INDEX identitystore_identity_account_history_connection_id ON identitystore_identity_account_history (lower(connection_id::text));
+CREATE INDEX identitystore_identity_account_history_id_identity ON identitystore_identity_account_history (id_identity);

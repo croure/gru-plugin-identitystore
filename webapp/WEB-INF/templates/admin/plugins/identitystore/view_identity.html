@@ -126,6 +126,27 @@
         </table>
     </#if>
 
+    <#if account_history?has_content>
+        <table class="table table-condensed table-striped" style="width: 50%;">
+            <thead>
+            <tr>
+                <th>#i18n{identitystore.view_identity.label.guid}</th>
+                <th>#i18n{identitystore.view_identity.label.creation.date}</th>
+                <th>#i18n{identitystore.view_identity.label.guid.deletion.date}</th>
+            </tr>
+            </thead>
+            <tbody>
+            <#list account_history as account>
+            <tr>
+                <td>${account.connectionId}</td>
+                <td><span>${account.creationDate?string["dd/MM/yyyy HH:mm:ss.SSS"]!}</span></td>
+                <td><span>${account.deletionDate?string["dd/MM/yyyy HH:mm:ss.SSS"]!}</span></td>
+            </tr>
+            </#list>
+            </tbody>
+        </table>
+    </#if>
+
     <#if master_cuid??>
         <table class="table table-condensed table-striped" style="width: 50%;">
             <thead>

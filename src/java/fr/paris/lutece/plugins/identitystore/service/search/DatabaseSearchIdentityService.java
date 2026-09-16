@@ -43,12 +43,19 @@ import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.search.QualifiedIdent
 import fr.paris.lutece.plugins.identitystore.v3.web.rs.dto.search.SearchAttribute;
 import fr.paris.lutece.plugins.identitystore.web.exception.IdentityStoreException;
 import fr.paris.lutece.portal.service.util.AppLogService;
+import fr.paris.lutece.portal.service.util.AppPropertiesService;
 import org.apache.commons.collections.CollectionUtils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class DatabaseSearchIdentityService implements ISearchIdentityService
 {
+
+    private static final boolean GUID_SEARCH_EXTENDED_IN_HISTORY = AppPropertiesService.getPropertyBoolean("identitystore.identity.extend.guid.search.to.history", true );
 
     /**
      * private constructor
@@ -106,6 +113,10 @@ public class DatabaseSearchIdentityService implements ISearchIdentityService
             if ( identity != null )
             {
                 return new QualifiedIdentitySearchResult( this.getEntities( Collections.singletonList( identity ) ) );
+            }
+            else if ( GUID_SEARCH_EXTENDED_IN_HISTORY )
+            {
+                return new QualifiedIdentitySearchResult( this.getEntities( IdentityHome.searchIdentityFromOldGuid( connectionId ) ) );
             }
         }
         catch( final IdentityStoreException e )

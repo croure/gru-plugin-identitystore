@@ -46,10 +46,12 @@ import fr.paris.lutece.portal.service.spring.SpringContextService;
 import fr.paris.lutece.portal.service.util.AppPropertiesService;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * This class provides instances management methods (create, find, ...) for Identity objects
@@ -139,6 +141,7 @@ public final class IdentityHome
     public static void hardRemove( int nIdentityId )
     {
         IdentityAttributeHome.removeAllAttributes( nIdentityId );
+        _dao.deleteIdentityAccountHistory( nIdentityId, _plugin );
         _dao.hardDelete( nIdentityId, _plugin );
     }
 
@@ -298,6 +301,25 @@ public final class IdentityHome
         }
 
         return identity;
+    }
+
+    /**
+     * Get the master identities from a given old <code>connectionId</code>.
+     * This means the given <code>connectionId</code> is not the identities current <code>connectionId</code>, but must be present in their account history.
+     * The master identity is search recursively over the <code>masterIdentityId</code>.
+     * It means that if identity A is merged into identity B, if A is found with the given old <code>connectionId</code>, it will return B.
+     * @param strConnectionId - The connection ID
+     * @param loadAttributes - if true, return identity with its attributes
+     * @return The Identity
+     */
+    public static List<Identity> findMasterIdentitiesByOldConnectionId( final String strConnectionId, final boolean loadAttributes )
+    {
+        final List<Identity> masterIdentityList = _dao.selectNotMergedByOldConnectionId( strConnectionId, _plugin );
+        if ( loadAttributes )
+        {
+            masterIdentityList.forEach( identity -> identity.setAttributes( IdentityAttributeHome.getAttributes( identity.getId( ) ) ) );
+        }
+        return masterIdentityList;
     }
 
     /**
@@ -525,4 +547,43 @@ public final class IdentityHome
     {
         return _dao.getHistoryStatusList( _plugin );
     }
+
+    /**
+     * Retrieve the identity full account history
+     * @param identityId - the identity ID
+     */
+    public static List<IdentityAccountHistory> selectFullIdentityAccountHistory( final int identityId )
+    {
+        return _dao.selectFullIdentityAccountHistory( identityId, _plugin );
+    }
+
+    /**
+     * Returns the identities having the requested customerId in their account history.
+     * @param connectionId - the connection ID
+     */
+    public static List<Identity> searchIdentityFromOldGuid( final String connectionId )
+    {
+        return _dao.searchIdentityFromOldGuid( connectionId, _plugin );
+    }
+
+    /**
+     * Insert a new identity account history
+     * @param identityAccountHistory - the identity account history
+     */
+    public static void insertIdentityAccountHistory( final IdentityAccountHistory identityAccountHistory )
+    {
+        _dao.insertIdentityAccountHistory( identityAccountHistory, _plugin );
+    }
+
+    /**
+     * Get the GUID creation date for the identity linked to the provided CUID
+     * @param cuid the identity CUID
+     * @param guid the GUID
+     * @return the GUID creation date for the identity linked to the provided CUID, or null if the GUID was never set to the identity
+     */
+    public static Timestamp getIdentityGuidCreationDate( final String cuid, final String guid )
+    {
+        return _dao.getIdentityGuidCreationDate( cuid, guid, _plugin );
+    }
+
 }

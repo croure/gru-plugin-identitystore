@@ -60,7 +60,6 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * This class represents a get request for IdentityStoreRestServive
@@ -138,14 +137,16 @@ public class IdentityStoreSearchRequest extends AbstractIdentityStoreAppCodeRequ
         final IdentitySearchResponse response = new IdentitySearchResponse( );
         if ( guidSearch )
         {
-            final IdentityDto identityDto = IdentityService.instance().search(StringUtils.EMPTY, _identitySearchRequest.getConnectionId(), serviceContract, _author);
-            response.getIdentities( ).add(identityDto);
+            final List<IdentityDto> resultList = IdentityService.instance().searchByConnectionId( _identitySearchRequest.getConnectionId(), serviceContract, _author);
+            response.getIdentities( ).addAll( resultList );
 
-            final IdentitySearchMessage alert =
-                    IdentityValidator.instance().verifyIfConsolidatedIdentitySearchResult(identityDto, null, _identitySearchRequest.getConnectionId());
-            if (alert != null) {
-                response.getAlerts().add(alert);
-            }
+            resultList.forEach(identityDto -> {
+                final IdentitySearchMessage alert =
+                        IdentityValidator.instance().verifyIfConsolidatedIdentityGuidSearchResult(identityDto, _identitySearchRequest.getConnectionId());
+                if (alert != null) {
+                    response.getAlerts().add(alert);
+                }
+            });
         }
         else
         {

@@ -37,7 +37,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-import fr.paris.lutece.plugins.grubusiness.business.notification.Notification;
 import fr.paris.lutece.plugins.grubusiness.business.web.rs.DemandDisplay;
 import fr.paris.lutece.plugins.grubusiness.business.web.rs.DemandResult;
 import fr.paris.lutece.plugins.grubusiness.business.web.rs.EnumGenericStatus;
@@ -78,15 +77,12 @@ import fr.paris.lutece.portal.util.mvc.commons.annotations.Action;
 import fr.paris.lutece.portal.util.mvc.commons.annotations.View;
 import fr.paris.lutece.util.http.SecurityUtil;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.ByteArrayOutputStream;
-import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -150,6 +146,7 @@ public class IdentityJspBean extends ManageIdentitiesJspBean
     private static final String MARK_MASTER_CUID = "master_cuid";
     private static final String MARK_MASTER_CUID_MODIFICATION_DATE = "master_cuid_consolidation_date";
     private static final String MARK_DELETE_HISTORY = "delete_history";
+    private static final String MARK_ACCOUNT_HISTORY = "account_history";
 
     // Views
     private static final String VIEW_MANAGE_IDENTITIES = "manageIdentitys";
@@ -183,6 +180,8 @@ public class IdentityJspBean extends ManageIdentitiesJspBean
 
     private final List<String> excludedAppCodes = Arrays
 	    .asList( AppPropertiesService.getProperty( "daemon.purgeIdentityDaemon.excluded.app.codes", "" ).split( "," ) );
+
+    private static final boolean GUID_SEARCH_EXTENDED_IN_HISTORY = AppPropertiesService.getPropertyBoolean("identitystore.identity.extend.guid.search.to.history", true );
 
     @View( value = VIEW_MANAGE_IDENTITIES, defaultView = true )
     public String getManageIdentitys( HttpServletRequest request )
@@ -237,6 +236,15 @@ public class IdentityJspBean extends ManageIdentitiesJspBean
 			{
 			    final IdentityDto qualifiedIdentity = DtoConverter.convertIdentityToDto( identity );
 			    _identities.add( qualifiedIdentity );
+			}
+			else if (GUID_SEARCH_EXTENDED_IN_HISTORY)
+			{
+				// If no identity was found with the current connection ID, search in the account history
+				final List<Identity> identityList = IdentityHome.findMasterIdentitiesByOldConnectionId(guid, true);
+				if ( !identityList.isEmpty( ) )
+				{
+					identityList.stream( ).map( DtoConverter::convertIdentityToDto ).forEach( _identities::add );
+				}
 			}
 		    }
 		    else
@@ -423,6 +431,10 @@ public class IdentityJspBean extends ManageIdentitiesJspBean
 				 this.addError( "Could not fetch consolidation history" );
 			 }
 		 }
+	 }
+	 if ( StringUtils.isNotBlank( _identity.getConnectionId( ) ) )
+	 {
+		 model.put( MARK_ACCOUNT_HISTORY, IdentityHome.selectFullIdentityAccountHistory( _identity.getId( ) ) );
 	 }
 
 	 return getPage( PROPERTY_PAGE_TITLE_VIEW_IDENTITY, TEMPLATE_VIEW_IDENTITY, model );

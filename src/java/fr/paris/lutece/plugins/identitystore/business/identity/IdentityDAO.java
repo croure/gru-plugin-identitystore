@@ -172,6 +172,21 @@ public final class IdentityDAO implements IIdentityDAO
     private static final String SQL_QUERY_SELECT_COUNT_INDEX_NOT_ELIGIBLE_IDENTITIES = "SELECT count(i.id_identity) FROM identitystore_identity i WHERE is_deleted = 1   OR is_merged = 1   OR not exists(SELECT a.id_attribute FROM identitystore_identity_attribute a WHERE i.id_identity = a.id_identity)";
     private static final String SQL_QUERY_SELECT_ACTIONS_ACTIVITIES = "SELECT change_type AS change_type_label, change_status , author_type, client_code , count(*) FROM identitystore_identity_history WHERE modification_date > NOW() - INTERVAL '${interval} DAY' GROUP BY change_type , change_status , author_type, client_code ORDER BY client_code, change_type, change_status";
     private static final String SQL_QUERY_SELECT_STATUS_LIST = "SELECT DISTINCT change_status FROM identitystore_identity_history";
+    private static final String SQL_QUERY_SELECT_GUID_CREATION_DATE = "SELECT modification_date FROM identitystore_identity_history WHERE customer_id = ? AND lower(metadata->>'new_guid') = lower(?) ORDER BY modification_date DESC LIMIT 1";
+
+    private static final String SQL_QUERY_SELECT_FULL_IDENTITY_ACCOUNT_HISTORY = "SELECT connection_id, id_identity, creation_date, deletion_date FROM identitystore_identity_account_history WHERE id_identity = ? ";
+    private static final String SQL_QUERY_DELETE_IDENTITY_ACCOUNT_HISTORY = "DELETE FROM identitystore_identity_account_history WHERE id_identity = ? ";
+    private static final String SQL_QUERY_INSERT_ACCOUNT_HISTORY = "INSERT INTO identitystore_identity_account_history (connection_id, id_identity, creation_date, deletion_date) VALUES (?, ?, ?, ?) ";
+    private static final String SQL_QUERY_SEARCH_IDENTITY_FROM_OLD_GUID = "SELECT " + COLUMNS + " FROM identitystore_identity a WHERE a.id_identity IN (SELECT DISTINCT h.id_identity FROM identitystore_identity_account_history h WHERE lower(h.connection_id) = lower(?) ) ";
+    private static final String SQL_QUERY_SELECT_NOT_MERGED_BY_OLD_CONNECTION_ID = "WITH RECURSIVE identity_tree AS ("
+            + "    SELECT id_identity, is_merged, id_master_identity, ARRAY[id_identity] path"
+            + "    FROM identitystore_identity"
+            + "    WHERE id_identity IN (SELECT h.id_identity FROM identitystore_identity_account_history h WHERE lower(h.connection_id) = lower(?))"
+            + "    UNION ALL"
+            + "    SELECT id.id_identity, id.is_merged, id.id_master_identity, path || id.id_identity"
+            + "    FROM identitystore_identity id" + "        INNER JOIN identity_tree mtree ON mtree.id_master_identity = id.id_identity and id.id_identity <> ALL(mtree.path) )"
+            + "       select " + COLUMNS + " from identitystore_identity a"
+            + "       where a.id_identity IN (SELECT t.id_identity FROM identity_tree t WHERE t.is_merged = 0)";
 
     private final ObjectMapper objectMapper = new ObjectMapper( );
 
@@ -1246,6 +1261,133 @@ public final class IdentityDAO implements IIdentityDAO
             return statusList;
         }
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public List<IdentityAccountHistory> selectFullIdentityAccountHistory( final int identityId, final Plugin plugin )
+    {
+        try ( final DAOUtil daoUtil = new DAOUtil( SQL_QUERY_SELECT_FULL_IDENTITY_ACCOUNT_HISTORY, plugin ) )
+        {
+            daoUtil.setInt( 1, identityId );
+            daoUtil.executeQuery( );
+
+            final List<IdentityAccountHistory> historyList = new ArrayList<>( );
+
+            while ( daoUtil.next( ) )
+            {
+                final IdentityAccountHistory history = new IdentityAccountHistory( );
+
+                int nIndex = 1;
+                history.setConnectionId( daoUtil.getString( nIndex++ ) );
+                history.setIdIdentity( daoUtil.getInt( nIndex++ ) );
+                history.setCreationDate( daoUtil.getTimestamp( nIndex++ ) );
+                history.setDeletionDate( daoUtil.getTimestamp( nIndex ) );
+
+                historyList.add( history );
+            }
+
+            return historyList;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public List<Identity> searchIdentityFromOldGuid( final String connectionId, final Plugin plugin )
+    {
+        try ( final DAOUtil daoUtil = new DAOUtil( SQL_QUERY_SEARCH_IDENTITY_FROM_OLD_GUID, plugin ) )
+        {
+            daoUtil.setString( 1, connectionId );
+            daoUtil.executeQuery( );
+
+            final List<Identity> identityList = new ArrayList<>();
+
+            while ( daoUtil.next( ) )
+            {
+                identityList.add( getIdentityFromQuery( daoUtil ) );
+            }
+
+            return identityList;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public List<Identity> selectNotMergedByOldConnectionId( final String strConnectionId, final Plugin plugin )
+    {
+        try ( final DAOUtil daoUtil = new DAOUtil( SQL_QUERY_SELECT_NOT_MERGED_BY_OLD_CONNECTION_ID, plugin ) )
+        {
+            daoUtil.setString( 1, strConnectionId );
+            daoUtil.executeQuery( );
+
+            final List<Identity> identityList = new ArrayList<>( );
+
+            while ( daoUtil.next( ) )
+            {
+                identityList.add( getIdentityFromQuery( daoUtil ) );
+            }
+
+            return identityList;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void deleteIdentityAccountHistory( final int identityId, final Plugin plugin )
+    {
+        try ( final DAOUtil daoUtil = new DAOUtil( SQL_QUERY_DELETE_IDENTITY_ACCOUNT_HISTORY, plugin ) )
+        {
+            daoUtil.setInt( 1, identityId );
+            daoUtil.executeUpdate( );
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void insertIdentityAccountHistory( final IdentityAccountHistory identityAccountHistory, final Plugin plugin )
+    {
+        try ( final DAOUtil daoUtil = new DAOUtil( SQL_QUERY_INSERT_ACCOUNT_HISTORY, plugin ) )
+        {
+            int nIndex = 1;
+            daoUtil.setString( nIndex++, identityAccountHistory.getConnectionId( ) );
+            daoUtil.setInt( nIndex++, identityAccountHistory.getIdIdentity( ) );
+            daoUtil.setTimestamp( nIndex++, identityAccountHistory.getCreationDate( ) );
+            daoUtil.setTimestamp( nIndex, identityAccountHistory.getDeletionDate( ) );
+
+            daoUtil.executeUpdate( );
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Timestamp getIdentityGuidCreationDate( final String cuid, final String guid, final Plugin plugin )
+    {
+        try ( final DAOUtil daoUtil = new DAOUtil( SQL_QUERY_SELECT_GUID_CREATION_DATE, plugin ) )
+        {
+            daoUtil.setString( 1, cuid );
+            daoUtil.setString( 2, guid );
+            daoUtil.executeQuery( );
+
+            if ( daoUtil.next( ) )
+            {
+                return daoUtil.getTimestamp( 1 );
+            }
+
+            return null;
+        }
+    }
+
 
     public  IndicatorsActionsType getIndicatorFromQuery (DAOUtil daoUtil)
     {
