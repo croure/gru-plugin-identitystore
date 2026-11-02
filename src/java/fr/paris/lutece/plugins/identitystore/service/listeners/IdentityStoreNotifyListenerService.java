@@ -137,7 +137,7 @@ public final class IdentityStoreNotifyListenerService
             }
             catch( Exception e )
             {
-                AppLogService.error( "An error occurred when notifying listener " + listener.getName( ) + " : " + e.getMessage( ) );
+                AppLogService.error( "An error occurred when notifying listener " + listener.getName( ) + " : " + e.getMessage( ), e );
             }
         } ).forEach( attributeExecutor::submit );
     }
@@ -170,7 +170,7 @@ public final class IdentityStoreNotifyListenerService
             }
             catch( Exception e )
             {
-                AppLogService.error( "An error occurred when notifying listener " + listener.getName( ) + " : " + e.getMessage( ) );
+                AppLogService.error( "An error occurred when notifying listener " + listener.getName( ) + " : " + e.getMessage( ), e );
             }
         } ).forEach( identityExecutor::submit );
     }
