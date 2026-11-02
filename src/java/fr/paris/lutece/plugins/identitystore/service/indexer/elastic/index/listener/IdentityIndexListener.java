@@ -75,29 +75,26 @@ public class IdentityIndexListener implements IdentityChangeListener
     public void processIdentityChange( IdentityChangeType identityChangeType, Identity identity, String statusCode, String statusMessage, RequestAuthor author,
             String clientCode, Map<String, String> metadata )
     {
-        final Map<String, AttributeObject> attributeObjects = this.mapToIndexObject( identity );
-        final IdentityObject identityObject = new IdentityObject( identity.getConnectionId( ), identity.getCustomerId( ), identity.getCreationDate( ),
-                identity.getLastUpdateDate( ), identity.getExpirationDate(), identity.getDeleteDate(), identity.isMonParisActive( ), attributeObjects );
-
         switch( identityChangeType )
         {
             case CREATE:
             case MERGE_CANCELLED:
                 AppLogService.debug( "Indexing identity change (" + identityChangeType.name( ) + ") with customerId = " + identity.getCustomerId( ) );
-                this._identityIndexer.create( identityObject, CURRENT_INDEX_ALIAS );
+                this._identityIndexer.create( this.toIdentityObject( identity ), CURRENT_INDEX_ALIAS );
                 break;
             case DELETE_REQUEST:
             case UPDATE:
             case CONSOLIDATED:
                 AppLogService.debug( "Indexing identity change (" + identityChangeType.name( ) + ") with customerId = " + identity.getCustomerId( ) );
-                this._identityIndexer.update( identityObject, CURRENT_INDEX_ALIAS );
+                this._identityIndexer.update( this.toIdentityObject( identity ), CURRENT_INDEX_ALIAS );
                 break;
             case DELETE:
             case MERGED:
                 AppLogService.debug( "Indexing identity change (" + identityChangeType.name( ) + ") with customerId = " + identity.getCustomerId( ) );
-                this._identityIndexer.delete( identityObject.getCustomerId( ), CURRENT_INDEX_ALIAS );
+                this._identityIndexer.delete( identity.getCustomerId( ), CURRENT_INDEX_ALIAS );
                 break;
             case READ:
+                return;
             case EXCLUDED:
             case EXCLUSION_CANCELLED:
             case MARKED_SUSPICIOUS:
@@ -108,6 +105,19 @@ public class IdentityIndexListener implements IdentityChangeListener
 
         // Ensure that the identity is a valid suspicion
         this.checkSuspicion( identity );
+    }
+
+    /**
+     * Builds the index document of the given {@link Identity}
+     *
+     * @param identity
+     *            the {@link Identity} to index
+     * @return the {@link IdentityObject} to send to the index
+     */
+    private IdentityObject toIdentityObject( final Identity identity )
+    {
+        return new IdentityObject( identity.getConnectionId( ), identity.getCustomerId( ), identity.getCreationDate( ), identity.getLastUpdateDate( ),
+                identity.getExpirationDate( ), identity.getDeleteDate( ), identity.isMonParisActive( ), this.mapToIndexObject( identity ) );
     }
 
     @Override
